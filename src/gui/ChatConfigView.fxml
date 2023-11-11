@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<VBox xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="gui.ChatConfigController">
+   <opaqueInsets>
+      <Insets />
+   </opaqueInsets>
+   <children>
+      <HBox spacing="20.0">
+         <children>
+            <VBox spacing="2.0">
+               <children>
+                  <CheckBox fx:id="checkBoxShowLikes" mnemonicParsing="false" text="Show likes">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowJoins" mnemonicParsing="false" text="Show joins">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowGifts" mnemonicParsing="false" text="Show gifts">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowQuestions" mnemonicParsing="false" text="Show questions">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowTimeStamp" mnemonicParsing="false" text="Show timestamp">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+               </children>
+            </VBox>
+            <VBox spacing="2.0">
+               <children>
+                  <CheckBox fx:id="checkBoxShowComments" mnemonicParsing="false" text="Show comments">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowFollows" mnemonicParsing="false" text="Show follows">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowShares" mnemonicParsing="false" text="Show shares">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowSubscribes" mnemonicParsing="false" text="Show subscribes">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+                  <CheckBox fx:id="checkBoxShowEmotes" mnemonicParsing="false" text="Show emotes">
+                     <font>
+                        <Font name="Lucida Console" size="14.0" />
+                     </font>
+                  </CheckBox>
+               </children>
+            </VBox>
+         </children>
+      </HBox>
+   </children>
+   <padding>
+      <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+   </padding>
+</VBox>
