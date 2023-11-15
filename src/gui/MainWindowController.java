@@ -1,17 +1,19 @@
 package gui;
 
+import java.io.File;
 import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 
 import application.Main;
+import entity.LiveClientEX;
+import entity.TTS;
 import enums.Icons;
 import gui.util.Alerts;
 import gui.util.ControllerUtils;
@@ -19,43 +21,41 @@ import io.github.jwdeveloper.tiktok.TikTokLive;
 import io.github.jwdeveloper.tiktok.data.models.Emote;
 import io.github.jwdeveloper.tiktok.data.models.RankingUser;
 import io.github.jwdeveloper.tiktok.data.models.gifts.Gift;
+import io.github.jwdeveloper.tiktok.exceptions.TikTokLiveOfflineHostException;
 import io.github.jwdeveloper.tiktok.live.LiveClient;
 import io.github.jwdeveloper.tiktok.models.ConnectionState;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import util.IniFile;
+import javafx.scene.layout.VBox;
 import util.Misc;
 import util.MyCalendar;
+import util.MyFile;
 
 public class MainWindowController implements Initializable {
 	
-	/**
-	 * Ativar os botões de ADICIONAR e REMOVER LIVE
-	 * 
-	 * Criar a classe de LiveClient que extende a classe original,
-	 * e adicionar métodos e atributos extras
-	 */
-	
 	private float coinValue = 0.025f;
-  private Map<LiveClient, List<String>> chatBuffers = new HashMap<>();
-  private Map<LiveClient, Map<Gift, Integer>> gifts = new HashMap<>();
   private List<LiveClient> connected;
 	private List<LiveClient> disconnected;
+	
+	private static ChatController chatController;
+	private static MainWindowController mainWindowController;
   
   @FXML
-  private TableView<LiveClient> tableViewLives;
+  private TableView<LiveClientEX> tableViewLives;
   @FXML
-  private TableColumn<LiveClient, LiveClient> tableColumnLive;
+  private TableColumn<LiveClientEX, LiveClientEX> tableColumnLive;
   @FXML
-  private TableColumn<LiveClient, LiveClient> tableColumnLiveViewers;
+  private TableColumn<LiveClientEX, LiveClientEX> tableColumnLiveViewers;
   @FXML
   private TableView<Gift> tableViewGifts;
   @FXML
@@ -65,71 +65,95 @@ public class MainWindowController implements Initializable {
   @FXML
   private TableColumn<Gift, Gift> tableColumnGiftVal;
   @FXML
-  private TextArea textAreaLiveInfos;
-  @FXML
-  private TextArea textAreaLiveChat;
-  @FXML
-  private TextArea textAreaJoins;
-  @FXML
   private TextField textFieldGiftsTotalValue;
   @FXML
   private Button buttonAddLive;
   @FXML
   private Button buttonRemoveLive;
   @FXML
-  private Button buttonChatConfig;
-  @FXML
   private TableColumn<RankingUser, RankingUser> tableColumnTopFollowersCoins;
   @FXML
   private TableColumn<RankingUser, RankingUser> tableColumnTopFollowersName;
   @FXML
   private TableView<RankingUser> tableViewTopFollowers;
+  @FXML
+  private TabPane tabPane;
+  @FXML
+  private Tab tabChat;
+  @FXML
+  private Tab tabConfigEventos;
+  @FXML
+  private Tab tabConfigOutros;
+  @FXML
+  private Tab tabConfigTTS;
   
 	@Override
  	public void initialize(URL url, ResourceBundle rb) {
+		mainWindowController = this;
+		File chatBufferDir = new File("./chatBuffers/");
+		if (!chatBufferDir.exists())
+			chatBufferDir.mkdir();
 		connected = new ArrayList<>();
 		disconnected = new ArrayList<>();
+		initTabs();
 		loadConfigs();
 		setLivesTableViewFactories();
 		setGiftsTableViewFactories();
 		setRankingUsersTableViewFactories();
 		setButtonsActions();
+		TTS.startTTS();
+	}
+	
+	private void initTabs() {
+		try {
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/ChatView.fxml"));
+			VBox vBoxFiltros = loader.load();
+			chatController = loader.getController();
+			tabChat.setContent(vBoxFiltros);
+		}
+		catch (Exception e) {}
 	}
 	
 	private void setButtonsActions() {
+		chatController.buttonChatConfig.setDisable(true);
 		buttonRemoveLive.setDisable(true);
 		buttonAddLive.setOnAction(e -> {
 			String user = Alerts.textPrompt("Prompt", "Adicionar nova live", null, "Digite o usuário da live á adicionar");
 			if (user != null) {
 				if (!TikTokLive.isHostNameValid(user))
 					Alerts.error("Erro", user + " - Usuário inválido");
-				else
+				else {
+					for (LiveClientEX client : tableViewLives.getItems())
+						if (client.getUserName().equals(user)) {
+							Alerts.warning("Advertência", "O usuário " + user + " já está na lista");
+							return;
+						}
 					addLive(user);
+				}
 			}
 		});		
 		buttonRemoveLive.setOnAction(e -> {
 			String user = tableViewLives.getSelectionModel().getSelectedItem().getRoomInfo().getHostName();
-			LiveClient liveClient = tableViewLives.getSelectionModel().getSelectedItem(); 
+			LiveClientEX liveClient = tableViewLives.getSelectionModel().getSelectedItem(); 
 			if (liveClient != null && Alerts.confirmation("Confirmação", "Deseja mesmo excluir a live \"" + user + "\" da lista?")) {
 				if (liveClient.getRoomInfo().getConnectionState() != ConnectionState.DISCONNECTED)
 					liveClient.disconnect();
 				tableViewLives.getItems().remove(liveClient);
+				if (tableViewLives.getItems().isEmpty())
+					chatController.buttonChatConfig.setDisable(true);
 			}
 		});
-		buttonChatConfig.setOnAction(e -> {
-			ChatConfigController.openChatConfig();
-		});
-		ControllerUtils.addIconToButton(buttonAddLive, Icons.ICON_NEWITEM.getValue(), 24, 24, 200);
-		ControllerUtils.addIconToButton(buttonRemoveLive, Icons.ICON_DELETE.getValue(), 24, 24, 200);
-		ControllerUtils.addIconToButton(buttonChatConfig, Icons.ICON_CONFIG.getValue(), 24, 24, 200);
+		ControllerUtils.addIconToButton(buttonAddLive, Icons.NEW_ITEM.getValue(), 24, 24, 200);
+		ControllerUtils.addIconToButton(buttonRemoveLive, Icons.DELETE.getValue(), 24, 24, 200);
 	}
 
 	private void connectToLive(LiveClient client) {
 		try {
+			chatController.clearChatTextArea();
 			Platform.runLater(() -> {
-				textAreaLiveChat.clear();
-				textAreaJoins.clear();
-				textAreaLiveInfos.clear();
+				chatController.buttonChatConfig.setDisable(false);
+				chatController.textAreaJoins.clear();
+				chatController.clearChatTextArea();
 				tableViewGifts.getItems().clear();
 				tableViewTopFollowers.getItems().clear();
 			});
@@ -142,10 +166,15 @@ public class MainWindowController implements Initializable {
 					}
 					connected.remove(0);
 				}
-				sendInfoToChat(client, "Conectando á live de " + client.getRoomInfo().getHostName());
+				if (!connected.contains(client)) {
+					LiveClientEX clientEX = new LiveClientEX(client);
+					connected.add(clientEX);
+					if (!clientEX.getCharBuffer().isEmpty())
+						chatController.addDirectlyToChatTextArea(String.join("\n", clientEX.getCharBuffer()));
+				}
+				sendInfoToChat(client, MyCalendar.dateToString(new Date(), "'Nova sessão: 'dd' de 'MMMM' de 'yyyy") + 
+						"\nConectando á live de " + client.getRoomInfo().getHostName(), true);
 				client.connectAsync();
-				if (!connected.contains(client))
-					connected.add(client);
 			}
 		}
 		catch (Exception e)
@@ -154,41 +183,38 @@ public class MainWindowController implements Initializable {
 
 	private void setLivesTableViewFactories() {
 		tableViewLives.getSelectionModel().selectedItemProperty().addListener((o, oldValue, newValue) -> {
+			chatController.setLiveChatMaxCaretPos(0);
+			TTS.clearBuffer();
 			buttonRemoveLive.setDisable(false);
 			if (newValue.getRoomInfo().getConnectionState() == ConnectionState.DISCONNECTED)
 				connectToLive(newValue);
 			else {
-				if (chatBuffers.containsKey(newValue)) {
-					StringBuilder sb = new StringBuilder();
-					for (String s : chatBuffers.get(newValue))
-						sb.append(sb.isEmpty() ? s : "\n\n" + s);
-					Platform.runLater(() -> { 
-						textAreaLiveChat.clear();
-						textAreaLiveChat.appendText(sb.toString());
-						tableViewGifts.getItems().clear();
-						if (gifts.containsKey(getCurrentLiveClient())) {
-							for (Gift gift : gifts.get(getCurrentLiveClient()).keySet())
-								tableViewGifts.getItems().add(gift);
-						}
-						tableViewGifts.refresh();
-	    			textFieldGiftsTotalValue.setText(totalCurrentGiftsValue());
-					});
-				}
+				Platform.runLater(() -> { 
+					if (!newValue.getCharBuffer().isEmpty()) {
+						chatController.clearChatTextArea();
+						chatController.addDirectlyToChatTextArea(String.join("\n", newValue.getCharBuffer()));
+					}
+					tableViewGifts.getItems().clear();
+					for (Gift gift : getCurrentLiveClient().getGiftsFromDate(new Date()))
+						tableViewGifts.getItems().add(gift);
+					tableViewGifts.refresh();
+    			textFieldGiftsTotalValue.setText(totalCurrentGiftsValue());
+				});
 			}
 		});
-		for (TableColumn<LiveClient, LiveClient> col : Arrays.asList(tableColumnLive, tableColumnLiveViewers)) {
+		for (TableColumn<LiveClientEX, LiveClientEX> col : Arrays.asList(tableColumnLive, tableColumnLiveViewers)) {
 			col.setStyle("-fx-font-size: 14px; -fx-font-family: \"Lucida Console\";");
 			col.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
 			col.setCellFactory(lv -> {
-				TableCell<LiveClient, LiveClient> cell = new TableCell<>() {
+				TableCell<LiveClientEX, LiveClientEX> cell = new TableCell<>() {
 					@Override
-					protected void updateItem(LiveClient client, boolean empty) {
+					protected void updateItem(LiveClientEX client, boolean empty) {
 						super.updateItem(client, empty);
 						if (client != null) {
 							if (col.getId().equals("tableColumnLive"))
 								setText(client.getRoomInfo().getHostName());
 							else
-								setText("" + client.getRoomInfo().getViewersCount());
+								setText("" + client.getRoomInfo().getViewersCount() + "/" + client.getRoomInfo().getTotalViewersCount());
 						}
 						else
 							setGraphic(null);
@@ -212,9 +238,9 @@ public class MainWindowController implements Initializable {
 							if (col.getId().equals("tableColumnGiftNome"))
 								setText(gift.getName());
 							else if (col.getId().equals("tableColumnGiftQuant"))
-								setText("" + gifts.get(getCurrentLiveClient()).get(gift));
+								setText("" + getCurrentLiveClient().getGiftQuantity(gift));
 							else
-								setText(textGiftValue(gift));
+								setText(strGiftCumulativeValue(gift));
 						}
 						else
 							setGraphic(null);
@@ -249,35 +275,33 @@ public class MainWindowController implements Initializable {
 		}
 	}
 	
-	private LiveClient getCurrentLiveClient()
+	LiveClientEX getCurrentLiveClient()
 		{ return tableViewLives.getSelectionModel().getSelectedItem(); }
 
-	private float giftValue(Gift gift)
-		{ return gifts.get(getCurrentLiveClient()).get(gift) * gift.getDiamondCost() * coinValue; }
+	private float giftCumulativeValue(Gift gift)
+		{ return getCurrentLiveClient().getGiftQuantity(gift) * gift.getDiamondCost() * coinValue; }
 	
-	private String textGiftValue(Gift gift)
-		{ return String.format("%.2f", giftValue(gift)); } 
+	private String strGiftCumulativeValue(Gift gift)
+		{ return String.format("%.2f", giftCumulativeValue(gift)); } 
 
-	public LiveClient addLive(String liveID) {
+	public LiveClientEX addLive(String liveID) {
 		try {
-			
 			LiveClient client = TikTokLive.newClient(liveID)
 				.configure((settings) -> {
 	        settings.setClientLanguage("pt");
 	        settings.setLogLevel(Level.OFF);
 	        settings.setPrintToConsole(false);
-	        settings.setHandleExistingEvents(true);
 	        settings.setRetryOnConnectionFailure(true);
 	        settings.setRetryConnectionTimeout(Duration.ofSeconds(60));
 		    })
 	    	.onConnected((liveClient, event) -> {
     			if (!isCurrentSelectedLive(liveClient))
-	    			sendInfoToChat(liveClient, "[NOTIFY] " + liveClient.getRoomInfo().getHostName() + " está ao vivo agora mesmo.", true);
+    				sendInfoToChat(liveClient, "[NOTIFY] " + liveClient.getRoomInfo().getHostName() + " está ao vivo agora mesmo.", true);
 	    		else {
 	    			sendInfoToChat(liveClient, "Conectado com sucesso á live de " + liveClient.getRoomInfo().getHostName());
-						synchronized (textAreaLiveInfos) {
-							textAreaLiveInfos.clear();
-							textAreaLiveInfos.appendText("Live de " + liveClient.getRoomInfo().getHostName());
+						synchronized (chatController.textAreaLiveInfos) {
+							chatController.clearChatTextArea();
+							chatController.addDirectlyToChatTextArea("Live de " + liveClient.getRoomInfo().getHostName());
 						}
 	    		}
 	    		tableViewLives.refresh();
@@ -287,7 +311,10 @@ public class MainWindowController implements Initializable {
 	    	.onDisconnected((liveClient, event) -> {
 	    		if (!disconnected.contains(liveClient) && connected.contains(liveClient)) {
 	    			sendInfoToChat(liveClient, "Você foi desconectado da live de " + liveClient.getRoomInfo().getHostName(), true);
-		    		connected.remove(liveClient);
+	      		connected.remove(liveClient);
+	      		disconnected.add(liveClient);
+	      		if (connected.size() < 4)
+	      			Misc.createTimer(0, 10000, () -> liveClient.connect());
 	    		}
 	    		else
 	    			disconnected.remove(liveClient);
@@ -297,31 +324,33 @@ public class MainWindowController implements Initializable {
     				sendInfoToChat(liveClient, liveClient.getRoomInfo().getHostName() + " pausou a live");
 	    	})
 	    	.onLiveEnded((liveClient, event) -> {
-    			sendInfoToChat(liveClient, (isCurrentSelectedLive(liveClient) ? "" : "[NOTIFY] ") + "A live de " + liveClient.getRoomInfo().getHostName() + " foi encerrada pelo anfitrião.", true);
+	    		sendInfoToChat(liveClient, (isCurrentSelectedLive(liveClient) ? "" : "[NOTIFY] ") + "A live de " + liveClient.getRoomInfo().getHostName() + " foi encerrada pelo anfitrião.", true);
 	    	})
 	    	.onJoin((liveClient, event) -> {
-	    		if (ChatConfigController.getShowJoins())
+	    		if (ChatConfigController.getShowJoins(getCurrentSelectedLiveUser()))
 	    			Platform.runLater(() -> {
 	    				tableViewLives.refresh();
-	    				sendToJoinTextArea(new Date(event.getTimeStamp()), event.getUser().getProfileName() + " acessou a live");
+	    				chatController.sendToJoinTextArea(new Date(event.getTimeStamp()), event.getUser().getProfileName() + " acessou a live");
 		    		});
 	    	})
 	    	.onComment((liveClient, event) -> {
-	    		if (ChatConfigController.getShowComments())
-	    			sendToChat(liveClient, new Date(event.getTimeStamp()), event.getUser().getProfileName() + ":\n" + event.getText());
+	    		if (ChatConfigController.getShowComments(getCurrentSelectedLiveUser())) { 
+	    			if (isCurrentSelectedLive(liveClient)) {
+	    				sendToChat(liveClient, new Date(event.getTimeStamp()), event.getUser().getProfileName() + ":\n  " + event.getText());
+			    		if (connected.contains(liveClient))
+			    			TTS.addText(event.getUser(), event.getText());
+	    			}
+		    		if (connected.contains(liveClient))
+		    			getCurrentLiveClient().addChat(event.getText());
+	    		}
 	    	})
 	    	.onGift((liveClient, event) -> {
-	    		if (ChatConfigController.getShowGifts())
+	    		if (ChatConfigController.getShowGifts(getCurrentSelectedLiveUser()))
 	    			sendInfoToChat(liveClient, new Date(event.getTimeStamp()), event.getUser().getProfileName() + " enviou [" + event.getGift().getName() + " x" + event.getCombo() + "]");
 	    		Platform.runLater(() -> {
-	    			if (!gifts.containsKey(liveClient))
-	    				gifts.put(liveClient, new HashMap<>());
-		    		if (!gifts.get(liveClient).containsKey(event.getGift())) {
-		    			gifts.get(liveClient).put(event.getGift(), 0);
-		    			if (isCurrentSelectedLive(liveClient))
-		    				tableViewGifts.getItems().add(event.getGift());
-		    		}
-		    		gifts.get(liveClient).put(event.getGift(), gifts.get(liveClient).get(event.getGift()) + event.getCombo());
+	    			getCurrentLiveClient().addGift(event.getGift(), event.getCombo());
+	    			if (!tableViewGifts.getItems().contains(event.getGift()))
+	    				tableViewGifts.getItems().add(event.getGift());
 	    			tableViewGifts.refresh();
 	    			textFieldGiftsTotalValue.setText(totalCurrentGiftsValue());
 	    		});
@@ -331,39 +360,44 @@ public class MainWindowController implements Initializable {
     				String emotes = "";
     				for (Emote emote : event.getEmotes())
     					emotes += (emotes.isBlank() ? "" : ", ") + emote.toString();
-  	    		if (ChatConfigController.getShowEmotes())
+  	    		if (ChatConfigController.getShowEmotes(getCurrentSelectedLiveUser()))
   	    			sendInfoToChat(liveClient, event.getUser().getProfileName() + " onEmote(): " + emotes);
     			}
 	    	})
 	    	.onFollow((liveClient, event) -> {
-    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowFollows())
-    				sendInfoToChat(liveClient, event.getUser().getProfileName() + " está seguindo o anfitrião da live");
+    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowFollows(getCurrentSelectedLiveUser()))
+    				sendInfoToChat(liveClient, event.getUser().getProfileName() + " está seguindo o anfitrião");
 	    	})
 	    	.onLike((liveClient, event) -> {
-    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowLikes())
-    				sendToJoinTextArea(new Date(event.getTimeStamp()), event.getUser().getProfileName() + " curtiu a live");
+    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowLikes(getCurrentSelectedLiveUser()))
+    				chatController.sendToJoinTextArea(new Date(event.getTimeStamp()), event.getUser().getProfileName() + " curtiu a live");
 	    	})
 	    	.onShare((liveClient, event) -> {
-    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowShares())
+    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowShares(getCurrentSelectedLiveUser()))
     				sendInfoToChat(liveClient, event.getUser().getProfileName() + " compartilhou a live");
 	    	})
 	    	.onSubscribe((liveClient, event) -> {
-    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowSubscribes())
+    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowSubscribes(getCurrentSelectedLiveUser()))
     				sendInfoToChat(liveClient, event.getUser().getProfileName() + " se inscreveu na live");
 	    	})
 	    	.onQuestion((liveClient, event) -> {
-    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowQuestions())
+    			if (isCurrentSelectedLive(liveClient) && ChatConfigController.getShowQuestions(getCurrentSelectedLiveUser()))
     				sendInfoToChat(liveClient, event.getUser().getProfileName() + " perguntou: " + event.getText());
 	    	})
 	    	.onError((liveClient, event) -> {
-	    		System.out.println("[" + liveClient.getRoomInfo().getHostName() + "] ERROR: " + event.getException());
-	    		event.getException().printStackTrace();
+	    		if (event.getException() instanceof TikTokLiveOfflineHostException)
+	    			sendInfoToChat(liveClient, "Não foi possível conectar á live de " + liveClient.getRoomInfo().getHostName(), true);
+	    		else {
+		    		System.out.println("[" + liveClient.getRoomInfo().getHostName() + "] ERROR: " + event.getException());
+		    		event.getException().printStackTrace();
+	    		}
 	    	})
-				.onRoomUserInfo((liveClient, event) -> {
+				.onRoomInfo((liveClient, event) -> {
+					final List<RankingUser> list = new LinkedList<>(event.getRoomInfo().getUsersRanking());
 					Platform.runLater(() -> {
 						synchronized (tableViewTopFollowers) {
 							tableViewTopFollowers.getItems().clear();
-							for (RankingUser user : event.getUsersRanking()) {
+							for (RankingUser user : list) {
 								tableViewTopFollowers.getItems().add(user);
 								if (tableViewTopFollowers.getItems().size() == 5)
 									break;
@@ -373,77 +407,52 @@ public class MainWindowController implements Initializable {
 					});		
 	    	})
 	    	.build();
-			tableViewLives.getItems().add(client);
-			return client;
+			LiveClientEX newClient = new LiveClientEX(client);
+			tableViewLives.getItems().add(newClient);
+			return newClient;
 		}
 		catch (Exception e)
 			{ return null; }
 	}
 	
-	private void sendToJoinTextArea(Date date, String text) {
-		Platform.runLater(() -> {
-			if (!textAreaJoins.getText().isEmpty())
-				textAreaJoins.appendText("\n");
-  		textAreaJoins.appendText(MyCalendar.dateToString(date, "'['HH:mm:ss'] '") + text);
-		});
-	}
+	private void sendInfoToChat(LiveClient liveClient, Date date, String text)
+		{ chatController.sendInfoToChat(liveClient, date, text); }
+
+	private void sendInfoToChat(LiveClient liveClient, String text)
+		{ chatController.sendInfoToChat(liveClient, text); }
+
+	private void sendInfoToChat(LiveClient liveClient, String text, boolean forceChat)
+		{ chatController.sendToChat(liveClient, null, text, forceChat); }
+
+	private void sendToChat(LiveClient liveClient, Date date, String text)
+		{ chatController.sendToChat(liveClient, date, text); }
 
 	private String totalCurrentGiftsValue() {
 		float value = 0;
-		if (gifts.containsKey(getCurrentLiveClient()))
-			for (Gift gift : gifts.get(getCurrentLiveClient()).keySet())
-				value += giftValue(gift);
+		for (Gift gift : getCurrentLiveClient().getGiftsFromDate(new Date()))
+				value += giftCumulativeValue(gift);
 		return String.format("R$ %.2f", value);
 	}
 
-	private void sendInfoToChat(LiveClient liveClient, Date date, String text, boolean forceChat)
-		{ sendToChat(liveClient, date, "* " + text, forceChat); }
+	String getCurrentSelectedLiveUser()
+		{ return tableViewLives.getSelectionModel().getSelectedItem().getUserName(); }
 	
-	private void sendInfoToChat(LiveClient liveClient, String text, boolean forceChat)
-		{ sendInfoToChat(liveClient, null, text, forceChat); }
-	
-	private void sendInfoToChat(LiveClient liveClient, Date date, String text)
-		{ sendToChat(liveClient, date, "* " + text, false); }
-
-	private void sendInfoToChat(LiveClient liveClient, String text)
-		{ sendInfoToChat(liveClient, null, text, false); }
-	
-	private void sendToChat(LiveClient liveClient, Date date, String text, boolean forceChat) {
-		Platform.runLater(() -> {
-			synchronized (textAreaLiveChat) {
-				String str = MyCalendar.dateToString(date == null ? new Date() : date, "'['HH:mm:ss'] '") + text;
-    		if (forceChat || isCurrentSelectedLive(liveClient))
-    			textAreaLiveChat.appendText(textAreaLiveChat.getText().isBlank() ? str : "\n\n" + str);
-    		if (!forceChat) {
-					if (!chatBuffers.containsKey(liveClient))
-						chatBuffers.put(liveClient, new ArrayList<>());
-					chatBuffers.get(liveClient).add(str);
-    		}
-			}
-		});
-	}
-
-	private void sendToChat(LiveClient liveClient, Date date, String text)
-		{ sendToChat(liveClient, date, text, false); }
-	
-	private boolean isCurrentSelectedLive(LiveClient liveClient) {
-		LiveClient client = tableViewLives.getSelectionModel().getSelectedItem();
-		return liveClient.equals(client);
-	}
+	boolean isCurrentSelectedLive(LiveClient liveClient)
+		{ return liveClient.getRoomInfo().getHostName().equals(getCurrentSelectedLiveUser()); }
 
 	public void close() {
-		for (LiveClient client : tableViewLives.getItems())
+		for (LiveClientEX client : tableViewLives.getItems()) {
 			client.disconnect();
+			if (client.getCharBuffer() != null && !client.getCharBuffer().isEmpty())
+				MyFile.writeAllLinesOnFile(client.getCharBuffer(), "./chatBuffers/" + client.getUserName() + ".txt"); 
+		}
 		saveConfigs();
 		ChatConfigController.close();
 	}
 
 	private void loadConfigs() {
 		for (String liveUsername : Main.getIni().getItemList("LIVES"))
-			if (Misc.alwaysFalse() && !TikTokLive.isHostNameValid(liveUsername))
-				System.out.println("Erro ao carregar lives do arquivo ini: " + liveUsername + " (usuário inválido)");
-			else
-				addLive(liveUsername);
+			addLive(liveUsername);
 	}
 
 	private void saveConfigs() {
@@ -451,5 +460,15 @@ public class MainWindowController implements Initializable {
 		for (LiveClient live : tableViewLives.getItems())
 			Main.getIni().write("LIVES", live.getRoomInfo().getHostName(), "1");
 	}
+	
+	static MainWindowController getMainWindowController()
+		{ return mainWindowController; }
+
+	static ChatController getChatController()
+		{ return chatController; }
+
+	/**
+	 * - ALTERAR O PROGRAMA PARA NÃO NARRAR EXATAMENTE TODAS AS MENSAGENS SE NAO ATRASA DEMAIS
+	 */
 
 }

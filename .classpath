@@ -12,6 +12,7 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="D:/Java/java-libs/MyPersonalLib.jar"/>
-	<classpathentry kind="lib" path="D:/Java/java-libs/TikTokLiveClient-1.0.4-Release-all.jar"/>
+	<classpathentry kind="lib" path="D:/Java/java-libs/JavaLayer/jl1.0.1.jar"/>
+	<classpathentry kind="lib" path="D:/Java/java-libs/TikTokLiveClient-1.0.6-Release-all.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

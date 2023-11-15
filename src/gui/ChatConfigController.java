@@ -3,6 +3,7 @@ package gui;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -15,9 +16,6 @@ import javafx.scene.control.CheckBox;
 import javafx.stage.Modality;
 
 public class ChatConfigController implements Initializable {
-	
-	private static Map<String, Boolean> checkBoxesStates = null;
-	private static ChatConfigController controller;
 	
   @FXML
   private CheckBox checkBoxShowComments;
@@ -40,82 +38,96 @@ public class ChatConfigController implements Initializable {
   @FXML
   private CheckBox checkBoxShowTimeStamp;
 
+	private static List<CheckBox> getCheckBoxes;
+	private static String[] getCheckBoxesStr = {
+		"checkBoxShowComments", "checkBoxShowFollows", "checkBoxShowJoins",
+		"checkBoxShowLikes", "checkBoxShowQuestions", "checkBoxShowGifts", "checkBoxShowEmotes",
+		"checkBoxShowShares", "checkBoxShowSubscribes", "checkBoxShowTimeStamp"};
+
+	private static Map<String, Map<String, Boolean>> checkBoxesStates;
+	
 	@Override
 	public void initialize(URL url, ResourceBundle rb) {
-		if (checkBoxesStates == null) {
-			checkBoxesStates = new LinkedHashMap<>();
-			for(CheckBox checkBox : getCheckBoxes())
-				try
-					{ checkBoxesStates.put(checkBox.getId(), Main.getIni().readAsBoolean("CHECKBOXES", checkBox.getId())); }
-				catch (Exception e)
-					{ checkBoxesStates.put(checkBox.getId(), true); }
-		}
+		getCheckBoxes = new LinkedList<>(Arrays.asList(
+				checkBoxShowComments, checkBoxShowFollows, checkBoxShowJoins, checkBoxShowLikes,
+				checkBoxShowQuestions, checkBoxShowGifts, checkBoxShowEmotes,
+				checkBoxShowShares, checkBoxShowSubscribes, checkBoxShowTimeStamp));
 	}
 	
-	private void defineCheckBoxes() {
-		for(CheckBox checkBox : getCheckBoxes()) {
-			checkBox.selectedProperty().addListener((o, wasSelected, isSelected) ->
-				{ checkBoxesStates.put(checkBox.getId(), isSelected); });
-			checkBox.setSelected(checkBoxesStates.get(checkBox.getId()));
-		}
-	}
-	
-	public static void openChatConfig() {
+	public static void openChatConfig(String liveUser) {
+		loadFromDisk(liveUser);
 		NewWindow newWindow = new NewWindow(Main.getWindow(), Modality.APPLICATION_MODAL, "/gui/ChatConfigView.fxml");
-		controller = newWindow.getController();
-		controller.defineCheckBoxes();
 		newWindow.getStage().setTitle("Configurações do chat");
 		newWindow.getStage().setResizable(false);
-		newWindow.showAndWait();
+		for (CheckBox checkBox : getCheckBoxes)
+			checkBox.setSelected(checkBoxesStates.get(liveUser).get(checkBox.getId()));
+		newWindow.show();
 	}
 
-	private List<CheckBox> getCheckBoxes() {
-		return Arrays.asList(checkBoxShowComments, checkBoxShowFollows,
-				checkBoxShowJoins, checkBoxShowLikes, checkBoxShowQuestions,
-				checkBoxShowGifts, checkBoxShowEmotes, checkBoxShowShares,
-				checkBoxShowSubscribes, checkBoxShowTimeStamp);
+	public static void close() {
+		for(String liveUser : checkBoxesStates.keySet()) {
+			StringBuilder sb = new StringBuilder();
+			for(String checkBox : checkBoxesStates.get(liveUser).keySet()) {
+				if (!sb.isEmpty())
+					sb.append(" ");
+				sb.append(checkBoxesStates.get(liveUser).get(checkBox));
+			}
+			Main.getIni().write("CHECKBOXES", liveUser, sb.toString());
+		}
 	}
 	
-	public static void close()
-		{ controller.closeConfig(); }
-	
-	public void closeConfig() {
-		for(CheckBox checkBox : getCheckBoxes())
-			Main.getIni().write("CHECKBOXES", checkBox.getId(), getCheckBoxesStates(checkBox.getId()).toString());
-	}
-	
-  public static boolean getShowComments()
-  	{ return getCheckBoxesStates("checkBoxShowComments"); }
+  public static boolean getShowComments(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowComments"); }
 
-  public static boolean getShowFollows()
-  	{ return getCheckBoxesStates("checkBoxShowFollows"); }
+  public static boolean getShowFollows(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowFollows"); }
   
-  public static boolean getShowJoins()
-  	{ return getCheckBoxesStates("checkBoxShowJoins"); }
+  public static boolean getShowJoins(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowJoins"); }
   
-  public static boolean getShowGifts()	
-  	{ return getCheckBoxesStates("checkBoxShowGifts"); }
+  public static boolean getShowGifts(String liveUser)	
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowGifts"); }
   
-  public static boolean getShowLikes()	
-  	{ return getCheckBoxesStates("checkBoxShowLikes"); }
+  public static boolean getShowLikes(String liveUser)	
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowLikes"); }
 
-  public static boolean getShowEmotes()
-  	{ return getCheckBoxesStates("checkBoxShowEmotes"); }
+  public static boolean getShowEmotes(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowEmotes"); }
   
-  public static boolean getShowQuestions()
-  	{ return getCheckBoxesStates("checkBoxShowQuestions"); }
+  public static boolean getShowQuestions(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowQuestions"); }
 
-	public static boolean getShowShares()
-  	{ return getCheckBoxesStates("checkBoxShowShares"); }
+	public static boolean getShowShares(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowShares"); }
   
-  public static boolean getShowSubscribes()
-  	{ return getCheckBoxesStates("checkBoxShowSubscribes"); }
+  public static boolean getShowSubscribes(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowSubscribes"); }
   
-  public static boolean getShowTimeStamp()
-  	{ return getCheckBoxesStates("checkBoxShowTimeStamp"); }
+  public static boolean getShowTimeStamp(String liveUser)
+  	{ return getCheckBoxesStates(liveUser, "checkBoxShowTimeStamp"); }
 
-  private static Boolean getCheckBoxesStates(String checkBoxName) {
-		return checkBoxesStates == null ? true : checkBoxesStates.get(checkBoxName);
+  private static Boolean getCheckBoxesStates(String liveUser, String checkBoxName) {
+ 		loadFromDisk(liveUser);
+		return checkBoxesStates.get(liveUser).get(checkBoxName);
 	}
 
+	private static void loadFromDisk(String liveUser) {
+  	if (checkBoxesStates == null)
+			checkBoxesStates = new LinkedHashMap<>();
+  	if (!checkBoxesStates.containsKey(liveUser)) {
+			checkBoxesStates.put(liveUser, new LinkedHashMap<>());
+			try {
+				String[] split = Main.getIni().read("CHECKBOXES", liveUser).split(" ");
+				for(int n = 0; n < split.length; n++) {
+					String checkBox = getCheckBoxesStr[n];
+					checkBoxesStates.get(liveUser).put(checkBox, Boolean.parseBoolean(split[n]));
+				}
+			}
+			catch (Exception e) {
+				for(int n = 0; n < getCheckBoxesStr.length; n++)
+					checkBoxesStates.get(liveUser).put(getCheckBoxesStr[n], true);
+			}
+		}
+	}
+	
 }

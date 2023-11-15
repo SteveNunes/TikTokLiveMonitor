@@ -9,6 +9,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import util.IniFile;
+import util.TextToSpeech;
 
 public class Main extends Application {
 	
@@ -17,6 +18,7 @@ public class Main extends Application {
 	private static Stage mainStage;
 	
 	public static void main(String[] args) {
+		TextToSpeech.setOutputTempFile("Z:\\");
 		launch(args);
 	}
 	
@@ -29,7 +31,8 @@ public class Main extends Application {
 			stage.setScene(new Scene(vBox));
 			stage.setTitle("TikTok Live Monitor");
 			MainWindowController controller = loader.getController();
-			stage.setOnCloseRequest(e -> controller.close());
+			stage.setOnCloseRequest(e ->
+				{ controller.close(); isClosed = true; });
 			stage.show();
 		}
 		catch (Exception e) {
